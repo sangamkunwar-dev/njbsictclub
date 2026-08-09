@@ -11,7 +11,6 @@ async function callAdmin<T>(body: Record<string, unknown>, requireAdmin = true):
   const token = data.session?.access_token;
   if (requireAdmin && !token) throw new Error("Your admin session has expired. Please sign in again.");
 
-  // Pass accessToken both in headers AND in body as a fallback
   const payload = {
     ...body,
     ...(token ? { accessToken: token } : {}),
@@ -37,7 +36,6 @@ async function callAdmin<T>(body: Record<string, unknown>, requireAdmin = true):
 export const listMemberAccounts = async (_input?: Call<{ accessToken?: string }>): Promise<MemberAccount[]> => {
   const res = await callAdmin<any>({ op: "list" });
 
-  // ✅ FIX: Extract array safely whether response is [...], { data: [...] }, or { members: [...] }
   if (Array.isArray(res)) return res;
   if (res && Array.isArray(res.data)) return res.data;
   if (res && Array.isArray(res.members)) return res.members;

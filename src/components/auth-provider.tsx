@@ -33,16 +33,25 @@ export function generateMemberId() {
 /**
  * Roles are decided by the account itself — never by a client-side choice:
  * - the club admin email is admin
- * - accounts created in the admin panel carry role/member_id metadata -> member
+ * - accounts created in the admin panel carry role/member_id/memberId metadata OR use @njbsict.club domain -> member
  * - everyone who signs up themselves is a visitor
  */
 function resolveRole(user: User): { role: UserRole; memberId?: string } {
   const email = user.email?.toLowerCase() ?? "";
   if (ADMIN_EMAILS.has(email)) return { role: "admin", memberId: "NJBs12134-ADMIN" };
 
-  const meta = (user.user_metadata ?? {}) as Record<string, string>;
-  if (meta.role === "member" || meta.member_id) {
-    return { role: "member", memberId: meta.member_id ?? generateMemberId() };
+  const userMeta = (user.user_metadata ?? {}) as Record<string, string>;
+  const appMeta = (user.app_metadata ?? {}) as Record<string, string>;
+
+  const role = userMeta.role || appMeta.role;
+  const memberId = userMeta.memberId || userMeta.member_id || appMeta.memberId || appMeta.member_id;
+
+  // Check explicit metadata OR email domain created by member-account-admin
+  if (role === "member" || memberId || email.endsWith("@njbsict.club")) {
+    return { 
+      role: "member", 
+      memberId: memberId ?? (email.includes("@") ? email.split("@")[0].toUpperCase() : generateMemberId()) 
+    };
   }
 
   return { role: "visitor" };
@@ -51,24 +60,34 @@ function resolveRole(user: User): { role: UserRole; memberId?: string } {
 function toAppUser(user: User): AppUser {
   const { role, memberId } = resolveRole(user);
   const meta = user.user_metadata ?? {};
+  
+  // Clean up display name
+  const rawName = meta.full_name ?? meta.name ?? (user.email ? user.email.split("@")[0] : "Member");
+
   const app: AppUser = {
     id: user.id,
     email: user.email ?? null,
-    name: meta.full_name ?? meta.name ?? user.email?.split("@")[0] ?? "Member",
+    name: rawName,
     avatar: meta.avatar_url ?? meta.picture ?? null,
     role,
     memberId,
   };
-  upsertRegisteredUser({
-    id: app.id,
-    email: app.email ?? "",
-    name: app.name,
-    avatar: app.avatar,
-    role: app.role,
-    memberId: app.memberId,
-    createdAt: new Date().toISOString(),
-    lastSeenAt: new Date().toISOString(),
-  });
+
+  try {
+    upsertRegisteredUser({
+      id: app.id,
+      email: app.email ?? "",
+      name: app.name,
+      avatar: app.avatar,
+      role: app.role,
+      memberId: app.memberId,
+      createdAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn("Failed to update registered user store:", err);
+  }
+
   return app;
 }
 
@@ -78,7 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If client proxy configuration is missing valid keys, don't attempt listeners
     if (!supabase || typeof supabase.auth === "undefined") {
       setLoading(false);
       return;

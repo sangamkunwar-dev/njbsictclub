@@ -52,9 +52,17 @@ export function MemberAccountsPanel() {
     setLoading(true);
     try {
       const data = await list({ data: { accessToken: await authToken() } });
-      setRows(data);
+      // ✅ FIX: Ensure the response is actually an array before setting state
+      if (Array.isArray(data)) {
+        setRows(data);
+      } else if (data && Array.isArray((data as any).data)) {
+        setRows((data as any).data);
+      } else {
+        setRows([]);
+      }
     } catch (e) {
       toast.error(errMsg(e));
+      setRows([]); // Fallback to empty array on fetch error
     } finally {
       setLoading(false);
     }
@@ -64,6 +72,8 @@ export function MemberAccountsPanel() {
     void refresh();
   }, [refresh]);
 
+  const safeRows = Array.isArray(rows) ? rows : [];
+
   return (
     <div className="space-y-6">
       <Card className="p-4 sm:p-6 border-border/50">
@@ -71,7 +81,7 @@ export function MemberAccountsPanel() {
           <div className="min-w-0">
             <h2 className="font-semibold flex items-center gap-2">
               <KeyRound className="h-4 w-4 shrink-0" />
-              Member logins ({rows.length})
+              Member logins ({safeRows.length})
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
               Create a username + password for each member. They sign in on the Sign in tab with
@@ -100,11 +110,11 @@ export function MemberAccountsPanel() {
 
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Loading accounts…</p>
-        ) : rows.length === 0 ? (
+        ) : safeRows.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No member logins yet.</p>
         ) : (
           <div className="space-y-2">
-            {rows.map((a) => (
+            {safeRows.map((a) => (
               <div
                 key={a.id}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border/50 p-3"
@@ -190,12 +200,13 @@ function ResetRequestsCard({
   onSetPassword: (userId: string, password: string) => Promise<void>;
 }) {
   const { rows, loading, remove } = useSubmissions("password_reset_request");
+  const safeRows = Array.isArray(rows) ? rows : [];
 
   return (
     <Card className="p-4 sm:p-6 border-border/50">
       <h2 className="font-semibold flex items-center gap-2">
         <LifeBuoy className="h-4 w-4 shrink-0" />
-        Password reset requests ({rows.length})
+        Password reset requests ({safeRows.length})
       </h2>
       <p className="text-xs text-muted-foreground mt-1 mb-4">
         Members who forgot their password. Set a new one, tell them, then clear the request.
@@ -203,12 +214,12 @@ function ResetRequestsCard({
 
       {loading ? (
         <p className="text-sm text-muted-foreground text-center py-6">Loading requests…</p>
-      ) : rows.length === 0 ? (
+      ) : safeRows.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-6">No pending requests.</p>
       ) : (
         <div className="space-y-2">
-          {rows.map((r) => {
-            const d = r.data as Record<string, string>;
+          {safeRows.map((r) => {
+            const d = (r.data || {}) as Record<string, string>;
             return (
               <div
                 key={r.id}
@@ -292,7 +303,7 @@ function AccountDialog({
       const message = errMsg(err);
       toast.error(
         message.includes("claims") || message.includes("Admin access")
-          ? "Your admin session is invalid or expired. Sign in again as njbsictclub@gmail.com."
+          ? "Your admin session is invalid or expired. Sign in again."
           : message,
       );
     } finally {
@@ -323,7 +334,7 @@ function AccountDialog({
               onChange={(e) =>
                 setForm({ ...form, memberId: e.target.value, username: e.target.value })
               }
-              placeholder="NJBs121341234"
+              placeholder="NJBS121341234"
               className="font-mono"
             />
             <p className="text-[11px] text-muted-foreground mt-1">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { QrCode, X, CheckCircle2, Lock, Video, MapPin, CalendarClock, TimerReset } from "lucide-react";
+import { QrCode, X, CheckCircle2, Lock, Video, MapPin, CalendarClock, TimerReset, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,10 +32,22 @@ function accessWindow(meeting: Meeting, checkedInAt: string) {
  */
 function codeMatchesMember(scanned: string, memberId: string) {
   const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const a = norm(scanned);
-  const b = norm(memberId);
-  if (!b) return true;
-  return a.includes(b) || b.includes(a);
+  const expected = norm(memberId);
+  if (!expected) return false;
+  const candidates = new Set<string>();
+  const add = (value: unknown) => { if (typeof value === "string" && value.trim()) candidates.add(value); };
+  add(scanned);
+  try {
+    const parsed = JSON.parse(scanned) as Record<string, unknown>;
+    add(parsed.memberId); add(parsed.member_id); add(parsed.username); add(parsed.id); add(parsed.email);
+  } catch { /* plain text QR */ }
+  for (const candidate of candidates) {
+    const actual = norm(candidate);
+    if (actual === expected || actual.includes(expected) || expected.includes(actual)) return true;
+    const emailLocal = actual.split("njbsictclub")[0];
+    if (emailLocal && (emailLocal === expected || emailLocal.includes(expected))) return true;
+  }
+  return false;
 }
 
 function formatCountdown(ms: number) {
@@ -55,6 +67,8 @@ export function MeetingCheckIn({ user, meetings }: Props) {
   const [joined, setJoined] = useState<JoinMap>({});
   const [now, setNow] = useState(() => Date.now());
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const processingRef = useRef(false);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const containerId = "meeting-qr-reader";
 
   useEffect(() => {
@@ -116,10 +130,13 @@ export function MeetingCheckIn({ user, meetings }: Props) {
   };
 
   const handleDecoded = async (text: string) => {
+    if (processingRef.current) return;
     const meeting = meetings.find((m) => m.id === meetingId);
-    if (!meeting) return;
+    if (!meeting || joined[meeting.id]) return;
+    processingRef.current = true;
     if (user.memberId && !codeMatchesMember(text, user.memberId)) {
-      toast.error("That QR isn't your member QR — open Profile and scan the QR shown there.");
+      toast.error("That QR does not match your member ID. Use the QR from your Profile page.");
+      processingRef.current = false;
       return;
     }
     await stop();
@@ -135,10 +152,23 @@ export function MeetingCheckIn({ user, meetings }: Props) {
         scannedCode: text,
       },
     });
-    if (error) { toast.error("Check-in failed"); return; }
+    if (error) { toast.error(error.message || "Check-in failed"); processingRef.current = false; return; }
     persistJoined({ ...joined, [meeting.id]: new Date().toISOString() });
+    processingRef.current = false;
     setNow(Date.now());
     toast.success(`Access unlocked for "${meeting.title}"`);
+  };
+
+  const scanImage = async (file: File) => {
+    if (!meetingId) { toast.error("Choose a meeting first"); return; }
+    try {
+      const scanner = new Html5Qrcode(`meeting-qr-file-${user.id}`);
+      const decoded = await scanner.scanFile(file, false);
+      await scanner.clear();
+      await handleDecoded(decoded);
+    } catch {
+      toast.error("No QR code was found in that image. Upload a clear member QR image.");
+    }
   };
 
   const start = async () => {
@@ -260,6 +290,22 @@ export function MeetingCheckIn({ user, meetings }: Props) {
                   </Button>
                 </>
               )}
+
+              <div id={`meeting-qr-file-${user.id}`} className="hidden" />
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void scanImage(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <Button type="button" variant="outline" className="w-full" onClick={() => imageInputRef.current?.click()}>
+                <ImagePlus className="h-4 w-4 mr-2" /> Upload QR image
+              </Button>
 
               <div className="rounded-lg border border-border/60 p-3 space-y-2">
                 <p className="text-[11px] text-muted-foreground">

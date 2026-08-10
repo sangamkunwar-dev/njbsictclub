@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Menu, X, LogOut, User as UserIcon, LayoutDashboard, Shield } from "lucide-react";
-import { ThemeToggle } from "./theme-toggle";
 import { useAuth } from "./auth-provider";
 import { cn } from "@/lib/utils";
 import {
@@ -69,7 +68,6 @@ export function Navbar() {
 
         <div className="flex items-center gap-2">
           {/* Desktop & Tablet Buttons */}
-          <ThemeToggle className="hidden sm:inline-flex" />
           <InstallButton className="hidden sm:inline-flex" />
           <NotificationBell />
           
@@ -156,9 +154,7 @@ export function Navbar() {
               </Link>
             ))}
             
-            {/* Added Install Button to mobile menu view alongside Theme Toggle */}
             <div className="flex items-center gap-2 pt-2 border-t border-border/50 mt-1">
-              <ThemeToggle />
               <InstallButton className="flex-1 sm:hidden" />
               {!user && (
                 <Button asChild size="sm" className="flex-1 bg-gradient-primary">

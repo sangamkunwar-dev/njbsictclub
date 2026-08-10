@@ -242,7 +242,7 @@ function ForgotPasswordDialog() {
     e.preventDefault();
     const value = identifier.trim().toLowerCase();
     if (value.length < 2) {
-      toast.error("Enter your email or member username");
+      toast.error("Enter your email, member ID, or username");
       return;
     }
     setBusy(true);
@@ -255,9 +255,12 @@ function ForgotPasswordDialog() {
         if (error) throw new Error(error.message);
         toast.success("Reset link sent — check your inbox.");
       } else {
-        const username = value.endsWith(`@${MEMBER_EMAIL_DOMAIN}`) ? value.split("@")[0] : value;
-        await requestReset({ data: { username, note } });
-        toast.success("Request sent to the club admin. They'll set a new password for you.");
+        const isMemberId = /^(njb|njbs|member)[-_ ]?[a-z0-9]+$/i.test(value);
+        const username = isMemberId
+          ? undefined
+          : value.endsWith(`@${MEMBER_EMAIL_DOMAIN}`) ? value.split("@")[0] : value;
+        await requestReset({ data: { username, memberId: isMemberId ? value.toUpperCase().replace(/[ ]+/g, "-") : undefined, note } });
+        toast.success("Recovery request sent. The club admin will send a secure reset link to your registered email.");
       }
       setOpen(false);
       setIdentifier("");
@@ -284,16 +287,16 @@ function ForgotPasswordDialog() {
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <Label>Email or member username</Label>
+            <Label>Email, member ID, or username</Label>
             <Input
               autoCapitalize="none"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="you@example.com or aayush"
+              placeholder="you@example.com or NJBS121348789"
             />
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Email accounts get a reset link. Member usernames go to the club admin, who sets a new
-              password for you.
+              Email accounts receive a secure reset link. Member IDs and usernames are sent to the club
+              admin, who sends the reset link to the member&apos;s registered email.
             </p>
           </div>
           <div>

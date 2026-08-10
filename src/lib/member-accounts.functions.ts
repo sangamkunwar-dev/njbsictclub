@@ -69,8 +69,10 @@ export const deleteMemberAccount = async ({ data }: Call<{ userId: string }>) =>
   return callAdmin<{ ok: true }>({ op: "delete", ...data });
 };
 
-export const requestMemberPasswordReset = async ({ data }: Call<{ username: string; note?: string }>) => {
-  if (!data) throw new Error("Reset request details are missing. Please try again.");
+export const requestMemberPasswordReset = async ({ data }: Call<{ username?: string; memberId?: string; note?: string }>) => {
+  if (!data || (!data.username && !data.memberId)) {
+    throw new Error("Enter your member ID or username.");
+  }
   return callAdmin<{ ok: true }>({ op: "reset-request", ...data }, false);
 };
 

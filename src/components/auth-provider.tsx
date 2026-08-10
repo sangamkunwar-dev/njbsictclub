@@ -24,6 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const ADMIN_EMAILS = new Set(["njbsictclub@gmail.com"]);
+const MEMBER_EMAIL_DOMAIN = "@njbsict.club";
 
 export function generateMemberId() {
   const suffix = Math.floor(1000 + Math.random() * 9000);
@@ -42,15 +43,15 @@ function resolveRole(user: User): { role: UserRole; memberId?: string } {
 
   const userMeta = (user.user_metadata ?? {}) as Record<string, string>;
   const appMeta = (user.app_metadata ?? {}) as Record<string, string>;
-
   const role = userMeta.role || appMeta.role;
   const memberId = userMeta.memberId || userMeta.member_id || appMeta.memberId || appMeta.member_id;
 
-  // Check explicit metadata OR email domain created by member-account-admin
-  if (role === "member" || memberId || email.endsWith("@njbsict.club")) {
-    return { 
-      role: "member", 
-      memberId: memberId ?? (email.includes("@") ? email.split("@")[0].toUpperCase() : generateMemberId()) 
+  // Admin-created accounts use explicit member metadata or the club-only
+  // domain, including accounts created before metadata was repaired.
+  if (role === "member" || memberId || email.endsWith(MEMBER_EMAIL_DOMAIN)) {
+    return {
+      role: "member",
+      memberId: memberId ?? (email.includes("@") ? email.split("@")[0].toUpperCase() : generateMemberId()),
     };
   }
 

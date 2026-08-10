@@ -100,14 +100,14 @@ export function MeetingCheckIn({ user, meetings }: Props) {
     void (async () => {
       const { data } = await supabase
         .from("submissions")
-        .select("event_id, created_at")
-        .eq("kind", "meeting_attendance")
+        .select("event_id, created_at, data")
+        .eq("kind", "event_registration")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (!alive || !data) return;
       const map: JoinMap = {};
-      (data as Array<{ event_id: string | null; created_at: string }>).forEach((r) => {
-        if (r.event_id && !map[r.event_id]) map[r.event_id] = r.created_at;
+      (data as Array<{ event_id: string | null; created_at: string; data?: { submissionType?: string } | null }>).forEach((r) => {
+        if (r.event_id && r.data?.submissionType === "meeting_attendance" && !map[r.event_id]) map[r.event_id] = r.created_at;
       });
       setJoined(map);
       localStorage.setItem(`ict-joined-${user.id}`, JSON.stringify(map));
@@ -145,6 +145,7 @@ export function MeetingCheckIn({ user, meetings }: Props) {
       event_id: meeting.id,
       user_id: user.id,
       data: {
+        submissionType: "meeting_attendance",
         memberId: user.memberId ?? null,
         name: user.name,
         email: user.email,

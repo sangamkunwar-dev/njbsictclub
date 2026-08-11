@@ -35,11 +35,12 @@ interface ProfileData {
   github: string;
   linkedin: string;
   twitter: string;
+  website: string;
   avatar: string | null;
   qr: string | null;
 }
 
-const EMPTY: ProfileData = { bio: "", skills: [], github: "", linkedin: "", twitter: "", avatar: null, qr: null };
+const EMPTY: ProfileData = { bio: "", skills: [], github: "", linkedin: "", twitter: "", website: "", avatar: null, qr: null };
 
 function ProfilePage() {
   const { user, loading } = useAuth();
@@ -220,6 +221,7 @@ function ProfilePage() {
             <Input placeholder="GitHub URL" value={profile.github} onChange={(e) => setProfile({ ...profile, github: e.target.value })} />
             <Input placeholder="LinkedIn URL" value={profile.linkedin} onChange={(e) => setProfile({ ...profile, linkedin: e.target.value })} />
             <Input placeholder="Twitter URL" value={profile.twitter} onChange={(e) => setProfile({ ...profile, twitter: e.target.value })} />
+            <Input type="url" placeholder="Personal website URL (https://...)" value={profile.website ?? ""} onChange={(e) => setProfile({ ...profile, website: e.target.value })} />
           </div>
         </Card>
 
@@ -296,5 +298,5 @@ function SharedProfileView({ profile }: { profile: NonNullable<ReturnType<typeof
 }
 
 function SharedProfileCard({ profile, name, email, role, memberId }: { profile: ProfileData; name: string; email: string; role: string; memberId?: string }) {
-  return <Card className="overflow-hidden border-border/50"><div className="bg-primary/10 p-6 sm:p-8"><div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">{profile.avatar ? <img src={profile.avatar} alt={`${name}'s profile photo`} className="h-28 w-28 rounded-full object-cover ring-4 ring-background" /> : <div className="flex h-28 w-28 items-center justify-center rounded-full bg-primary text-4xl font-bold text-primary-foreground">{name.charAt(0).toUpperCase()}</div>}<div><h1 className="text-3xl font-bold">{name}</h1><p className="mt-1 text-muted-foreground">{email}</p><p className="mt-2 text-sm capitalize">{role}{memberId ? ` · ${memberId}` : ""}</p></div></div></div><div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_180px]"> <div className="space-y-6"><section><h2 className="font-semibold">About</h2><p className="mt-2 whitespace-pre-wrap leading-6 text-muted-foreground">{profile.bio || "No bio added yet."}</p></section><section><h2 className="font-semibold">Skills</h2><div className="mt-2 flex flex-wrap gap-2">{profile.skills.length ? profile.skills.map((skill) => <Badge key={skill}>{skill}</Badge>) : <span className="text-sm text-muted-foreground">No skills added yet.</span>}</div></section><section><h2 className="font-semibold">Links</h2><div className="mt-2 flex flex-col gap-2 text-sm">{[profile.github, profile.linkedin, profile.twitter].filter(Boolean).map((link) => <a key={link} href={link} target="_blank" rel="noreferrer" className="text-primary hover:underline">{link}</a>)}{![profile.github, profile.linkedin, profile.twitter].some(Boolean) && <span className="text-muted-foreground">No links added yet.</span>}</div></section></div>{profile.qr && <div className="text-center"><p className="mb-2 text-sm font-medium">Member QR</p><img src={profile.qr} alt={`Member QR for ${name}`} className="mx-auto w-full max-w-[180px] rounded-lg border bg-white p-2" />{memberId && <p className="mt-2 font-mono text-xs text-muted-foreground">{memberId}</p>}</div>}</div></Card>;
+  return <Card className="overflow-hidden border-border/50"><div className="bg-primary/10 p-6 sm:p-8"><div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">{profile.avatar ? <img src={profile.avatar} alt={`${name}'s profile photo`} className="h-28 w-28 rounded-full object-cover ring-4 ring-background" /> : <div className="flex h-28 w-28 items-center justify-center rounded-full bg-primary text-4xl font-bold text-primary-foreground">{name.charAt(0).toUpperCase()}</div>}<div><h1 className="text-3xl font-bold">{name}</h1><p className="mt-1 text-muted-foreground">{email}</p><p className="mt-2 text-sm capitalize">{role}{memberId ? ` · ${memberId}` : ""}</p></div></div></div><div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_180px]"> <div className="space-y-6"><section><h2 className="font-semibold">About</h2><p className="mt-2 whitespace-pre-wrap leading-6 text-muted-foreground">{profile.bio || "No bio added yet."}</p></section><section><h2 className="font-semibold">Skills</h2><div className="mt-2 flex flex-wrap gap-2">{profile.skills.length ? profile.skills.map((skill) => <Badge key={skill}>{skill}</Badge>) : <span className="text-sm text-muted-foreground">No skills added yet.</span>}</div></section><section><h2 className="font-semibold">Links</h2><div className="mt-2 flex flex-col gap-2 text-sm">{[profile.website, profile.github, profile.linkedin, profile.twitter].filter(Boolean).map((link) => <a key={link} href={link} target="_blank" rel="noreferrer" className="break-all text-primary hover:underline">{link}</a>)}{![profile.website, profile.github, profile.linkedin, profile.twitter].some(Boolean) && <span className="text-muted-foreground">No links added yet.</span>}</div></section></div>{profile.qr && <div className="text-center"><p className="mb-2 text-sm font-medium">Member QR</p><img src={profile.qr} alt={`Member QR for ${name}`} className="mx-auto w-full max-w-[180px] rounded-lg border bg-white p-2" />{memberId && <p className="mt-2 font-mono text-xs text-muted-foreground">{memberId}</p>}</div>}</div></Card>;
 }

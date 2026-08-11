@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Upload, QrCode, Save, X, Download } from "lucide-react";
+import { Upload, QrCode, Save, X, Download, Share2, Eye, Copy, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,20 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/profile")({
   component: ProfilePage,
 });
+
+function encodeProfile(data: unknown) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+}
+
+function decodeProfile(value: string): ProfileData & { name: string; email: string; role: string; memberId?: string } | null {
+  try {
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(value)))) as Record<string, unknown>;
+    if (typeof parsed.name !== "string" || typeof parsed.email !== "string" || typeof parsed.profile !== "object" || !parsed.profile) return null;
+    const profile = parsed.profile as ProfileData;
+    if (!Array.isArray(profile.skills) || typeof profile.bio !== "string") return null;
+    return { ...profile, name: parsed.name, email: parsed.email, role: String(parsed.role ?? "member"), memberId: typeof parsed.memberId === "string" ? parsed.memberId : undefined };
+  } catch { return null; }
+}
 
 interface ProfileData {
   bio: string;
@@ -31,10 +45,20 @@ function ProfilePage() {
   const nav = useNavigate();
   const [profile, setProfile] = useState<ProfileData>(EMPTY);
   const [skillInput, setSkillInput] = useState("");
+  const [sharedProfile, setSharedProfile] = useState<ReturnType<typeof decodeProfile>>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareChecked, setShareChecked] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) nav({ to: "/auth", search: { redirect: "/profile" } });
-  }, [loading, user, nav]);
+    const shared = new URLSearchParams(window.location.search).get("share");
+    if (shared) setSharedProfile(decodeProfile(shared));
+    setShareChecked(true);
+  }, []);
+
+  useEffect(() => {
+    if (shareChecked && !sharedProfile && !loading && !user) nav({ to: "/auth", search: { redirect: "/profile" } });
+  }, [loading, user, nav, sharedProfile, shareChecked]);
 
   useEffect(() => {
     if (user) {
@@ -43,12 +67,28 @@ function ProfilePage() {
     }
   }, [user]);
 
+  if (sharedProfile) return <SharedProfileView profile={sharedProfile} />;
   if (!user) return null;
 
   const save = () => {
     localStorage.setItem(`ict-profile-${user.id}`, JSON.stringify(profile));
     toast.success("Profile saved");
   };
+
+  const createShareUrl = () => {
+    const payload = encodeProfile({ name: user.name, email: user.email, role: user.role, memberId: user.memberId, profile: { ...profile, qr: shownQr } });
+    const url = `${window.location.origin}/profile?share=${encodeURIComponent(payload)}`;
+    setShareUrl(url);
+    return url;
+  };
+
+  const shareProfile = async () => {
+    const url = createShareUrl();
+    if (navigator.share) await navigator.share({ title: `${user.name} — ICT Club profile`, text: "View my ICT Club profile", url });
+    else { await navigator.clipboard.writeText(url); toast.success("Profile link copied"); }
+  };
+
+  const copyShareUrl = async () => { await navigator.clipboard.writeText(shareUrl || createShareUrl()); toast.success("Profile link copied"); };
 
   const readFile = (file: File, key: "avatar" | "qr") => {
     const reader = new FileReader();
@@ -94,6 +134,8 @@ function ProfilePage() {
           {(user.role === "member" || user.role === "admin") && (
             <Button asChild variant="outline"><Link to="/dashboard">Dashboard</Link></Button>
           )}
+          <Button variant="outline" onClick={() => setShowPreview(true)}><Eye className="h-4 w-4 mr-2" />Preview</Button>
+          <Button variant="outline" onClick={shareProfile}><Share2 className="h-4 w-4 mr-2" />Share</Button>
           <Button onClick={save} className="bg-gradient-primary"><Save className="h-4 w-4 mr-2" />Save</Button>
         </div>
       </div>
@@ -181,6 +223,29 @@ function ProfilePage() {
           </div>
         </Card>
       </div>
+      {showPreview && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-background/95 p-4 sm:p-8">
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-bold">Profile preview</h2>
+              <Button variant="outline" onClick={() => setShowPreview(false)}><X className="mr-2 h-4 w-4" />Close</Button>
+            </div>
+            <SharedProfileCard profile={{ ...profile, qr: shownQr }} name={user.name} email={user.email} role={user.role} memberId={user.memberId} />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button onClick={shareProfile}><Share2 className="mr-2 h-4 w-4" />Share this profile</Button>
+              <Button variant="outline" onClick={copyShareUrl}><Copy className="mr-2 h-4 w-4" />Copy link</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function SharedProfileView({ profile }: { profile: NonNullable<ReturnType<typeof decodeProfile>> }) {
+  return <div className="container mx-auto max-w-3xl px-4 py-10"><div className="mb-6 flex items-center justify-between"><Badge variant="secondary">Shared ICT Club profile</Badge><Button asChild variant="outline"><Link to="/"><ArrowLeft className="mr-2 h-4 w-4" />Home</Link></Button></div><SharedProfileCard profile={profile} name={profile.name} email={profile.email} role={profile.role} memberId={profile.memberId} /></div>;
+}
+
+function SharedProfileCard({ profile, name, email, role, memberId }: { profile: ProfileData; name: string; email: string; role: string; memberId?: string }) {
+  return <Card className="overflow-hidden border-border/50"><div className="bg-primary/10 p-6 sm:p-8"><div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">{profile.avatar ? <img src={profile.avatar} alt={`${name}'s profile photo`} className="h-28 w-28 rounded-full object-cover ring-4 ring-background" /> : <div className="flex h-28 w-28 items-center justify-center rounded-full bg-primary text-4xl font-bold text-primary-foreground">{name.charAt(0).toUpperCase()}</div>}<div><h1 className="text-3xl font-bold">{name}</h1><p className="mt-1 text-muted-foreground">{email}</p><p className="mt-2 text-sm capitalize">{role}{memberId ? ` · ${memberId}` : ""}</p></div></div></div><div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_180px]"> <div className="space-y-6"><section><h2 className="font-semibold">About</h2><p className="mt-2 whitespace-pre-wrap leading-6 text-muted-foreground">{profile.bio || "No bio added yet."}</p></section><section><h2 className="font-semibold">Skills</h2><div className="mt-2 flex flex-wrap gap-2">{profile.skills.length ? profile.skills.map((skill) => <Badge key={skill}>{skill}</Badge>) : <span className="text-sm text-muted-foreground">No skills added yet.</span>}</div></section><section><h2 className="font-semibold">Links</h2><div className="mt-2 flex flex-col gap-2 text-sm">{[profile.github, profile.linkedin, profile.twitter].filter(Boolean).map((link) => <a key={link} href={link} target="_blank" rel="noreferrer" className="text-primary hover:underline">{link}</a>)}{![profile.github, profile.linkedin, profile.twitter].some(Boolean) && <span className="text-muted-foreground">No links added yet.</span>}</div></section></div>{profile.qr && <div className="text-center"><p className="mb-2 text-sm font-medium">Member QR</p><img src={profile.qr} alt={`Member QR for ${name}`} className="mx-auto w-full max-w-[180px] rounded-lg border bg-white p-2" />{memberId && <p className="mt-2 font-mono text-xs text-muted-foreground">{memberId}</p>}</div>}</div></Card>;
 }

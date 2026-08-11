@@ -78,10 +78,17 @@ function ProfilePage() {
 
   const createShareUrl = async () => {
     const base = user.name || user.email?.split("@")[0] || "member";
-    const slug = base.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "member";
+    const baseSlug = base.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "member";
     const payload = { name: user.name, email: user.email, role: user.role, memberId: user.memberId, profile: { ...profile, qr: shownQr } };
+
+    // Keep the friendly username URL when available. If another member already
+    // uses it, add the member ID so every profile gets its own public link.
+    const { data: existing } = await supabase.from("profile_shares").select("owner_id").eq("slug", baseSlug).maybeSingle();
+    const suffix = (user.memberId || user.id.slice(0, 8)).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
+    const slug = existing && existing.owner_id !== user.id ? `${baseSlug}-${suffix || "profile"}` : baseSlug;
     const { error } = await supabase.from("profile_shares").upsert({ slug, owner_id: user.id, payload }, { onConflict: "slug" });
     if (error) {
+      console.error("[v0] Short profile link failed:", error);
       toast.error("Could not create the short link. Please try again.");
       throw error;
     }

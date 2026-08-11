@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/components/auth-provider";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/profile")({
   component: ProfilePage,
@@ -75,9 +76,16 @@ function ProfilePage() {
     toast.success("Profile saved");
   };
 
-  const createShareUrl = () => {
-    const payload = encodeProfile({ name: user.name, email: user.email, role: user.role, memberId: user.memberId, profile: { ...profile, qr: shownQr } });
-    const url = `${window.location.origin}/profile?share=${encodeURIComponent(payload)}`;
+  const createShareUrl = async () => {
+    const base = user.name || user.email?.split("@")[0] || "member";
+    const slug = base.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "member";
+    const payload = { name: user.name, email: user.email, role: user.role, memberId: user.memberId, profile: { ...profile, qr: shownQr } };
+    const { error } = await supabase.from("profile_shares").upsert({ slug, owner_id: user.id, payload }, { onConflict: "slug" });
+    if (error) {
+      toast.error("Could not create the short link. Please try again.");
+      throw error;
+    }
+    const url = `${window.location.origin}/${slug}`;
     setShareUrl(url);
     return url;
   };
@@ -103,7 +111,7 @@ function ProfilePage() {
   };
 
   const shareProfile = async () => {
-    const url = createShareUrl();
+    const url = await createShareUrl();
     try {
       if (navigator.share) {
         await navigator.share({ title: `${user.name} — ICT Club profile`, text: "View my ICT Club profile", url });
@@ -115,7 +123,7 @@ function ProfilePage() {
     }
   };
 
-  const copyShareUrl = async () => copyText(shareUrl || createShareUrl());
+  const copyShareUrl = async () => copyText(shareUrl || await createShareUrl());
 
   const readFile = (file: File, key: "avatar" | "qr") => {
     const reader = new FileReader();

@@ -86,11 +86,12 @@ function ProfilePage() {
     // uses it, add the member ID so every profile gets its own public link.
     const { data: existing } = await supabase.from("profile_shares").select("owner_id").eq("slug", baseSlug).maybeSingle();
     const suffix = (user.memberId || user.id.slice(0, 8)).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
-    const slug = existing && existing.owner_id !== user.id ? `${baseSlug}-${suffix || "profile"}` : baseSlug;
+    const rawSlug = existing && existing.owner_id !== user.id ? `${baseSlug}-${suffix || "profile"}` : baseSlug;
+    const slug = rawSlug.slice(0, 30).replace(/-+$/g, "") || `member-${user.id.slice(0, 8)}`;
     const { error } = await supabase.from("profile_shares").upsert({ slug, owner_id: user.id, payload }, { onConflict: "slug" });
     if (error) {
       console.error("[v0] Short profile link failed:", error);
-      toast.error("Could not create the short link. Please try again.");
+      toast.error(error.message?.includes("row-level security") ? "Please sign in again before sharing your profile." : "Could not create the short link. Please try again.");
       throw error;
     }
     const url = `${window.location.origin}/${slug}`;

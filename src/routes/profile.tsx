@@ -82,13 +82,40 @@ function ProfilePage() {
     return url;
   };
 
-  const shareProfile = async () => {
-    const url = createShareUrl();
-    if (navigator.share) await navigator.share({ title: `${user.name} — ICT Club profile`, text: "View my ICT Club profile", url });
-    else { await navigator.clipboard.writeText(url); toast.success("Profile link copied"); }
+  const copyText = async (text: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = text;
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+      }
+      toast.success("Profile URL copied. You can paste and share it anywhere.");
+    } catch {
+      toast.error("Copy failed. Select the URL and copy it manually.");
+    }
   };
 
-  const copyShareUrl = async () => { await navigator.clipboard.writeText(shareUrl || createShareUrl()); toast.success("Profile link copied"); };
+  const shareProfile = async () => {
+    const url = createShareUrl();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${user.name} — ICT Club profile`, text: "View my ICT Club profile", url });
+      } else {
+        await copyText(url);
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) await copyText(url);
+    }
+  };
+
+  const copyShareUrl = async () => copyText(shareUrl || createShareUrl());
 
   const readFile = (file: File, key: "avatar" | "qr") => {
     const reader = new FileReader();
@@ -235,6 +262,13 @@ function ProfilePage() {
               <Button onClick={shareProfile}><Share2 className="mr-2 h-4 w-4" />Share this profile</Button>
               <Button variant="outline" onClick={copyShareUrl}><Copy className="mr-2 h-4 w-4" />Copy link</Button>
             </div>
+            {shareUrl && (
+              <div className="mt-4 flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/40 p-3 sm:flex-row sm:items-center">
+                <label htmlFor="profile-share-url" className="sr-only">Profile share URL</label>
+                <input id="profile-share-url" value={shareUrl} readOnly className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-xs" onFocus={(event) => event.currentTarget.select()} />
+                <Button variant="outline" onClick={copyShareUrl}><Copy className="mr-2 h-4 w-4" />Copy URL</Button>
+              </div>
+            )}
           </div>
         </div>
       )}

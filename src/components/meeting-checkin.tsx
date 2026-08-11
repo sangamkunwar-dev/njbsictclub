@@ -141,7 +141,9 @@ export function MeetingCheckIn({ user, meetings }: Props) {
     }
     await stop();
     const { error } = await supabase.from("submissions").insert({
-      kind: "meeting_attendance",
+      // submissions.kind only accepts the public form kinds; distinguish
+      // meeting attendance inside the JSON payload.
+      kind: "event_registration",
       event_id: meeting.id,
       user_id: user.id,
       data: {
@@ -153,7 +155,12 @@ export function MeetingCheckIn({ user, meetings }: Props) {
         scannedCode: text,
       },
     });
-    if (error) { toast.error(error.message || "Check-in failed"); processingRef.current = false; return; }
+    if (error) {
+      console.error("[v0] Meeting check-in failed:", error);
+      toast.error("Could not record attendance. Please try again or use Verify ID.");
+      processingRef.current = false;
+      return;
+    }
     persistJoined({ ...joined, [meeting.id]: new Date().toISOString() });
     processingRef.current = false;
     setNow(Date.now());

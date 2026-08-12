@@ -78,6 +78,12 @@ function ProfilePage() {
   };
 
   const createShareUrl = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    const ownerId = authData.user?.id;
+    if (!ownerId || ownerId !== user.id) {
+      toast.error("Your session expired. Please sign in again before sharing.");
+      throw new Error("Authenticated session is missing");
+    }
     const base = user.name || user.email?.split("@")[0] || "member";
     const baseSlug = base.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "member";
     const payload = { name: user.name, email: user.email, role: user.role, memberId: user.memberId, profile: { ...profile, qr: shownQr } };
@@ -88,7 +94,7 @@ function ProfilePage() {
     const suffix = (user.memberId || user.id.slice(0, 8)).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
     const rawSlug = existing && existing.owner_id !== user.id ? `${baseSlug}-${suffix || "profile"}` : baseSlug;
     const slug = rawSlug.slice(0, 30).replace(/-+$/g, "") || `member-${user.id.slice(0, 8)}`;
-    const { error } = await supabase.from("profile_shares").upsert({ slug, owner_id: user.id, payload }, { onConflict: "slug" });
+    const { error } = await supabase.from("profile_shares").upsert({ slug, owner_id: ownerId, payload }, { onConflict: "slug" });
     if (error) {
       console.error("[v0] Short profile link failed:", error);
       toast.error(error.message?.includes("row-level security") ? "Please sign in again before sharing your profile." : "Could not create the short link. Please try again.");

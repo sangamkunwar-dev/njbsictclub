@@ -90,14 +90,18 @@ function ProfilePage() {
 
     // Keep the friendly username URL when available. If another member already
     // uses it, add the member ID so every profile gets its own public link.
-    const { data: existing } = await supabase.from("profile_shares").select("owner_id").eq("slug", baseSlug).maybeSingle();
-    const suffix = (user.memberId || user.id.slice(0, 8)).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
-    const rawSlug = existing && existing.owner_id !== user.id ? `${baseSlug}-${suffix || "profile"}` : baseSlug;
-    const slug = rawSlug.slice(0, 30).replace(/-+$/g, "") || `member-${user.id.slice(0, 8)}`;
-    const { error } = await supabase.from("profile_shares").upsert({ slug, owner_id: ownerId, payload }, { onConflict: "slug" });
+    const { data: existing, error: lookupError } = await supabase.from("profile_shares").select("slug, owner_id").eq("slug", baseSlug).maybeSingle();
+    const suffix = (user.memberId || ownerId.slice(0, 8)).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
+    const rawSlug = existing && existing.owner_id !== ownerId ? `${baseSlug}-${suffix || "profile"}` : baseSlug;
+    const slug = rawSlug.slice(0, 30).replace(/-+$/g, "") || `member-${ownerId.slice(0, 8)}`;
+    const record = { slug, owner_id: ownerId, payload };
+    const { error } = existing?.owner_id === ownerId
+      ? await supabase.from("profile_shares").update({ payload }).eq("slug", slug).eq("owner_id", ownerId)
+      : await supabase.from("profile_shares").insert(record);
+    if (lookupError && lookupError.code !== "PGRST116") console.warn("[v0] Share lookup warning:", lookupError.message);
     if (error) {
       console.error("[v0] Short profile link failed:", error);
-      toast.error(error.message?.includes("row-level security") ? "Please sign in again before sharing your profile." : "Could not create the short link. Please try again.");
+      toast.error(`Short link failed: ${error.message}`);
       throw error;
     }
     const url = `${window.location.origin}/${slug}`;

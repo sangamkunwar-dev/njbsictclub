@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Cookie, X } from "lucide-react";
+import { Cookie, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const KEY = "ict-cookie-consent";
@@ -14,6 +14,7 @@ export function CookieBanner() {
 
   const decide = (choice: "accepted" | "rejected") => {
     localStorage.setItem(KEY, choice);
+    window.dispatchEvent(new CustomEvent("njbs:cookie-consent", { detail: { analytics: choice === "accepted" } }));
     setVisible(false);
   };
 
@@ -21,16 +22,15 @@ export function CookieBanner() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[60] p-3 md:p-5 pointer-events-none">
-      <div className="pointer-events-auto mx-auto max-w-3xl rounded-2xl border border-border/60 glass shadow-elegant p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4">
+      <div className="pointer-events-auto mx-auto max-w-4xl rounded-3xl border border-border/60 bg-card/95 p-4 shadow-elegant backdrop-blur-xl md:p-5 flex flex-col md:flex-row md:items-center gap-4">
         <div className="flex items-start gap-3 flex-1">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Cookie className="h-4 w-4" />
+            <ShieldCheck className="h-4 w-4" />
           </div>
           <div className="text-sm">
-            <p className="font-medium">We use cookies</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              We store your role, profile, and preferences locally to keep the app working.
-              Accept to allow non-essential storage or reject to keep only what's required.
+            <p className="font-semibold tracking-tight">Your privacy, your choice</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              We use essential storage to keep NJBS ICT Club secure and working. Choose Accept to enable privacy-respecting usage analytics and improve the experience, or Reject to keep analytics off.
             </p>
           </div>
         </div>
